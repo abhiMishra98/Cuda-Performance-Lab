@@ -38,15 +38,13 @@ READMEs) were measured on:
   correctly. Full writeup, numbers, and timeline screenshot in
   [histogram/README.md](histogram/README.md).
 
-- **tileMatMul.cu**. Tiled square matrix multiplication using shared memory.
-  Loads `TILE_WIDTH x TILE_WIDTH` tiles of the input matrices into shared
-  memory per block to reduce global memory traffic. Assumes the matrix width
-  is evenly divisible by `TILE_WIDTH`.
-
-- **tileMatMulGeneric.cu**. Same tiled matrix multiplication approach as
-  `tileMatMul.cu`, generalized to matrix widths that are *not* evenly
-  divisible by `TILE_WIDTH`, with boundary checks that zero-pad out-of-range
-  shared memory loads.
+- **[GEMM/](GEMM/)**. Tiled, shared-memory matrix multiplication
+  (`tileMatMul.cu`/`tileMatMulGeneric.cu`). Both load
+  `TILE_WIDTH x TILE_WIDTH` tiles of the input matrices into shared memory
+  per block to cut down on repeated global memory reads; the generic
+  version additionally handles matrix widths that aren't evenly divisible
+  by `TILE_WIDTH`, with boundary checks that zero-pad out-of-range shared
+  memory loads. Full writeup in [GEMM/README.md](GEMM/README.md).
 
 ### Kernel only, host setup pending
 
@@ -74,7 +72,7 @@ nvcc convolution.cu -o convolution.exe
 .\convolution.exe
 ```
 
-**tileMatMul / tileMatMulGeneric**:
+**GEMM** (from the `GEMM/` folder):
 
 ```powershell
 nvcc tileMatMul.cu -o tileMatMul.exe
