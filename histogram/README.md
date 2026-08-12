@@ -9,13 +9,12 @@ letters each (`[a-d]`, `[e-h]`, ... `[y-z]`). Built up as a sequence of
 measured optimizations rather than a single kernel.
 
 </td>
-<td valign="top" align="right" width="320">
+<td valign="top" align="left" width="320">
 
 **Skills covered**
 
 - Atomics & privatization (global → block → register)
 - Coalesced memory access patterns
-- Launch config sized to GPU occupancy, not input size
 - Nsight Systems timeline profiling
 
 </td>
