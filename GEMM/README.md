@@ -1,8 +1,26 @@
+<table>
+<tr>
+<td valign="top">
+
 # GEMM (General Matrix Multiply)
 
 Tiled, shared-memory matrix multiplication, in two versions: one assuming
 the matrix width divides evenly into the tile size, and one generalized to
 handle widths that don't.
+
+</td>
+<td valign="top" align="right" width="320">
+
+**Skills covered**
+
+- Shared-memory tiling for reuse
+- Boundary handling for non-divisible matrix widths
+- Zero-padding out-of-range shared-memory loads
+- Thread/block indexing for 2D tiled workloads
+
+</td>
+</tr>
+</table>
 
 ## Table of contents
 

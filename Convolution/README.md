@@ -1,8 +1,29 @@
+<table>
+<tr>
+<td valign="top">
+
 # Convolution
 
 CUDA implementations of 1D and 2D convolution, each with a naive (global-memory)
 baseline and a shared-memory tiled variant. Includes benchmarking with
 `cudaEvent`s and profiling notes from Nsight Systems and Nsight Compute.
+
+</td>
+<td valign="top" align="right" width="320">
+
+**Skills covered**
+
+- Halo-tiled shared-memory kernels
+- `__constant__` memory (broadcast reads)
+- Pitched allocation (`cudaMallocPitch`/`cudaMemcpy2D`)
+- Roofline analysis: compute- vs. bandwidth- vs. latency-bound
+- Nsight Systems (transfer/compute overlap)
+- Nsight Compute (SpeedOfLight, SourceCounters)
+- `cudaEvent` benchmarking with GPU warmup
+
+</td>
+</tr>
+</table>
 
 ## Table of contents
 

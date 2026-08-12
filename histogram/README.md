@@ -1,8 +1,26 @@
+<table>
+<tr>
+<td valign="top">
+
 # Histogram
 
 Counts occurrences of `a-z` in a byte buffer, bucketed into 7 groups of 4
 letters each (`[a-d]`, `[e-h]`, ... `[y-z]`). Built up as a sequence of
 measured optimizations rather than a single kernel.
+
+</td>
+<td valign="top" align="right" width="320">
+
+**Skills covered**
+
+- Atomics & privatization (global → block → register)
+- Coalesced memory access patterns
+- Launch config sized to GPU occupancy, not input size
+- Nsight Systems timeline profiling
+
+</td>
+</tr>
+</table>
 
 ## Table of contents
 
