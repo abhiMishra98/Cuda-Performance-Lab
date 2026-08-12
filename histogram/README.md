@@ -23,6 +23,7 @@ measured optimizations rather than a single kernel.
 
 ## Table of contents
 
+- [Usage](#usage)
 - [What is a histogram kernel doing here](#what-is-a-histogram-kernel-doing-here)
 - [Implementations](#implementations)
 - [Coalesced memory access](#coalesced-memory-access)
@@ -30,6 +31,37 @@ measured optimizations rather than a single kernel.
 - [Launch config: sizing the grid to the GPU, not the input](#launch-config-sizing-the-grid-to-the-gpu-not-the-input)
 - [Measured results (Nsight Systems)](#measured-results-nsight-systems)
 - [Next optimization: overlapping transfer with compute (planned)](#next-optimization-overlapping-transfer-with-compute-planned)
+
+## Usage
+
+Unlike the other programs in this repo, `histogram` reads its input from
+disk at runtime rather than generating it in-memory, so it takes real
+command-line arguments:
+
+```powershell
+nvcc -std=c++17 histogram.cu -o histogram.exe
+.\histogram.exe [input-path] [--print | -v]
+```
+
+- `input-path` — optional positional argument, the byte buffer to
+  histogram. Defaults to `input.txt` in the current directory if omitted.
+- `--print` / `-v` — optional flag; prints both kernels' bucket counts to
+  stdout after they run. Without it, the program runs silently (useful for
+  profiling with `nsys`, where extra stdout I/O is just noise).
+
+Example:
+
+```powershell
+.\histogram.exe --print input.txt
+bucket          naive   privatized
+a-d           1563766      1563766
+e-h           1561736      1561736
+i-l           1561732      1561732
+m-p           1563360      1563360
+q-t           1562235      1562235
+u-x           1563263      1563263
+y-z            779490       779490
+```
 
 ## What is a histogram kernel doing here
 

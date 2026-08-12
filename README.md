@@ -87,19 +87,21 @@ nvcc tileMatMulGeneric.cu -o tileMatMulGeneric.exe
 .\tileMatMulGeneric.exe
 ```
 
-**histogram** (from the `histogram/` folder) needs an extra flag plus a test
-file, since it reads input at runtime rather than generating it:
+**histogram** (from the `histogram/` folder) needs an extra build flag plus
+a test file, since it reads input at runtime rather than generating it:
 
 ```powershell
 cd histogram
 nvcc -std=c++17 histogram.cu -o histogram.exe
-.\histogram.exe
+.\histogram.exe --print input.txt
 ```
 
 The `-std=c++17` flag is required; CUDA's `<cuda/atomic>` header won't
 compile without it. `input.txt` isn't checked into the repo (see
 [histogram/README.md](histogram/README.md) for why); generate your own
-before running, e.g. a few MB of random bytes.
+before running, e.g. a few MB of random bytes. See
+[histogram/README.md#usage](histogram/README.md#usage) for the full
+`input-path`/`--print` argument reference.
 
 `clr_greyscale.cu` and `blurKernel.cu` aren't runnable yet; they'll get the
 same treatment once their host-side code lands.

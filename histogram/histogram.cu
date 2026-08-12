@@ -68,12 +68,26 @@ __global__ void histo_kernel(unsigned char *buffer, long size, int *histo)
     }
 }
 
-int main()
+static const char *const kBucketLabels[7] = {
+    "a-d", "e-h", "i-l", "m-p", "q-t", "u-x", "y-z"};
+
+int main(int argc, char **argv)
 {
-    FILE *file = fopen("input.txt", "rb");
+    const char *inputPath = "input.txt";
+    bool printResults = false;
+
+    for (int i = 1; i < argc; ++i)
+    {
+        if (strcmp(argv[i], "--print") == 0 || strcmp(argv[i], "-v") == 0)
+            printResults = true;
+        else
+            inputPath = argv[i];
+    }
+
+    FILE *file = fopen(inputPath, "rb");
     if (!file)
     {
-        fprintf(stderr, "Failed to open input.txt\n");
+        fprintf(stderr, "Failed to open %s\n", inputPath);
         return EXIT_FAILURE;
     }
     fseek(file, 0, SEEK_END);
@@ -109,6 +123,17 @@ int main()
 
     histo_kernel<<<gridDim, blockDim>>>(d_buffer, size, d_histo);
     CUDA_CHECK(cudaGetLastError());
+
+    if (printResults)
+    {
+        int h_histo[7], h_histo_naive[7];
+        CUDA_CHECK(cudaMemcpy(h_histo_naive, d_histo_naive, 7 * sizeof(int), cudaMemcpyDeviceToHost));
+        CUDA_CHECK(cudaMemcpy(h_histo, d_histo, 7 * sizeof(int), cudaMemcpyDeviceToHost));
+
+        printf("%-8s %12s %12s\n", "bucket", "naive", "privatized");
+        for (int i = 0; i < 7; ++i)
+            printf("%-8s %12d %12d\n", kBucketLabels[i], h_histo_naive[i], h_histo[i]);
+    }
 
     free(h_buffer);
     cudaFree(d_buffer);
