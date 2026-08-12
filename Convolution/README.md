@@ -13,6 +13,7 @@ baseline and a shared-memory tiled variant. Includes benchmarking with
 - [Measured results: naive vs. shared](#measured-results-naive-vs-shared)
 - [Profiling with Nsight Systems](#profiling-with-nsight-systems)
 - [Profiling with Nsight Compute](#profiling-with-nsight-compute)
+- [Next steps](#next-steps)
 - [Compiling and running](#compiling-and-running)
 
 ## What is convolution
@@ -134,18 +135,6 @@ address and copies directly into it. Nothing in the type system enforces
 that this call happens before the kernel launch that reads `d_M`; only call
 order does.
 
-> **Note.** During development, `main()` briefly declared a local
-> `float *d_M` for the (at the time) unfilled `conv_1d` call, which shadowed
-> the file-scope `__constant__ d_M` for the rest of `main()`.
-> `cudaMemcpyToSymbol(d_M, ...)` then silently resolved to that local,
-> uninitialized pointer instead of the constant symbol, failing with
-> `invalid device symbol`. The mask was never copied, and `conv_2d_shared`
-> ran against whatever was already in constant memory. The call itself was
-> well-typed throughout; it simply bound to the wrong symbol. Local names
-> that collide with a `__constant__`/`__device__` symbol are worth avoiding
-> for exactly this reason. (The 1D naive kernel's mask pointer is `d_M1d`
-> today, clear of any name collision.)
-
 ## `cudaMallocPitch`
 
 **What it is.** A device allocator for 2D data that pads each row up to a
@@ -191,9 +180,8 @@ rather than `cudaMemcpy`, for the same reason.
 
 `main()` runs each pair (`conv_1d`/`conv_1d_shared` and
 `conv_2d`/`conv_2d_shared`) on the same random input, timed with
-`cudaEvent`s, so the numbers below are a direct, apples-to-apples
-naive-vs-tiled comparison rather than two separately sized runs. This is a
-pure timing harness (real allocation, real random input, `cudaEvent`-timed
+`cudaEvent`s, so the numbers below are a direct comparison rather than two separately sized runs.
+This is a pure timing harness (real allocation, real random input, `cudaEvent`-timed
 launches); each kernel's output was verified against a CPU reference during
 development, but `main()` itself does not re-check correctness on every run.
 
@@ -282,37 +270,57 @@ switched to its **Roofline** view:
 ![conv_2d roofline](../images/Conv_v1_2d_ncu.png)
 ![conv_2d_shared roofline](../images/Conv_v1_2dShared_ncu.png)
 
-**Reading the charts.** Only `conv_1d`'s dot sits close to its own roofline
-diagonal, so that one is genuinely memory-bound: the "move less data to go
-faster" logic actually applies to it. The other three sit well below their
-diagonal, and `conv_2d`/`conv_2d_shared` do so even though tiling and
-constant memory gave them *more* reuse per byte than the 1D kernels, not
-less. A kernel that does more with each byte but still doesn't go faster
-isn't limited by bandwidth or compute; it's limited by latency, meaning too
-few warps are in flight at once to hide memory stalls.
+**Reading the charts.** Only `conv_1d` sits close to its own roofline
+diagonal — that's the one kernel where "move less data to go faster" is
+actually the lever to pull. The other three sit well below their diagonal,
+and `conv_2d`/`conv_2d_shared` sit lowest of all *despite* tiling and
+constant memory giving them more reuse per byte than the 1D kernels, not
+less. More reuse without more speed rules out the usual two suspects
+(bandwidth, compute) and points at a third: latency. Too few warps are
+in flight per scheduler to hide memory stalls, so the SM sits idle waiting
+on data rather than being throttled by how much of it has to move.
 
-`ncu` points at two concrete causes, not "not enough math" (none of these
-kernels are close to the compute ceiling in the first place):
+`ncu` backs this with two concrete, fixable causes — not "not enough math,"
+since none of these four kernels get anywhere near the compute ceiling in
+the first place:
 
-- **Uncoalesced memory access.** `SourceCounters` reports excessive memory
-  sectors on all four kernels (12% for `conv_1d`, 10% for `conv_1d_shared`,
-  **24%** for `conv_2d`, 12% for `conv_2d_shared`). `conv_2d` is worst: its
-  16x16 thread block and row-major indexing mean close to a quarter of its
-  memory traffic moves bytes no thread needed. Fixing the access pattern
-  would raise the achieved point without changing arithmetic intensity.
-- **Instruction mix skewed toward address math, not FP32 work.** For
-  `conv_1d`, `ncu` reports 55% "Compute (SM) Throughput," but only 6% of
-  that is the actual FP32 FMA pipe; it separately flags the ALU pipeline as
-  the busiest at 36.7%. Most of that ALU work is bounds-checking and index
-  arithmetic, not the convolution itself, so the SM is busy without doing
-  much of the work the roofline chart credits.
+- **Uncoalesced memory access.** `SourceCounters` flags excess memory
+  sectors on every kernel (`conv_1d` 12%, `conv_1d_shared` 10%, `conv_2d`
+  **24%**, `conv_2d_shared` 12%). `conv_2d` is the outlier: its 16x16
+  thread block and row-major indexing mean roughly a quarter of its memory
+  traffic moves bytes no thread asked for. This is a pure access-pattern
+  fix — it raises the achieved point on the chart without touching
+  arithmetic intensity at all.
+- **Instruction mix skewed toward address math, not FP32 work.** `conv_1d`
+  reports 55% "Compute (SM) Throughput," but only 6 of those points come
+  from the FP32 FMA pipe; the ALU pipeline is the actual busiest unit, at
+  36.7%. Most of that ALU traffic is bounds-checking and index arithmetic
+  around the convolution, not the convolution itself — the SM looks busy
+  on the chart while doing comparatively little of the work the chart
+  credits it for.
 
-**Net takeaway.** For this workload, adding more arithmetic (a wider mask,
-more work per thread, fp16) would not help; none of the four kernels are
-compute-limited. The more useful next steps are occupancy and
-coalescing fixes, such as simplifying boundary checks, fixing `conv_2d`'s
-access pattern, and keeping more warps active per scheduler, to close the
-gap to each kernel's own roofline.
+**Net takeaway.** Adding arithmetic — a wider mask, more work per thread,
+fp16 — would not move any of these four kernels, because none of them are
+compute-limited. The gap to each kernel's own roofline closes through
+occupancy and coalescing work instead: fixing `conv_2d`'s access pattern,
+simplifying the boundary-check arithmetic, and keeping more warps resident
+per scheduler.
+
+## Next steps
+
+Diagnosis above stops short of a fix. What's queued up next, in order:
+
+- Fix `conv_2d`'s uncoalesced access by widening its block to a full warp
+  (`blockDim.x = 32` instead of `16`), then re-profile with `ncu` to confirm
+  the roofline point actually moves.
+- Pull the **Occupancy** and **Warp State Statistics** sections from the
+  existing `ncu` report to back the "latency-bound" call with achieved
+  occupancy and stall-reason numbers, instead of inferring it from the
+  roofline chart alone.
+- Add a checked-in correctness verification path (currently the CPU-reference
+  check was ad hoc during development, not something `main()` re-runs).
+- Compare achieved bandwidth against a vendor-optimized baseline (e.g.
+  cuDNN's convolution path) for scale.
 
 ## Compiling and running
 

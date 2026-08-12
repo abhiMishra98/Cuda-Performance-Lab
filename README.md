@@ -15,8 +15,13 @@ measured benchmarks and, where relevant, Nsight Systems/Compute profiling.
 All benchmarks and profiling numbers in this repo (including sub-folder
 READMEs) were measured on:
 
-- **GPU:** NVIDIA GeForce GTX 1650, 14 SMs
+- **GPU:** NVIDIA GeForce GTX 1650, 14 SMs, compute capability 7.5 (Turing)
 - **Peak memory bandwidth:** ~192 GB/s
+- **Driver:** 610.74
+- **CUDA Toolkit:** 13.0 (`nvcc` release 13.0, V13.0.88)
+- **Build flags:** none beyond `nvcc <file>.cu -o <file>.exe` (see each
+  program's "Compiling and running" section) — device code uses `nvcc`'s
+  default optimization level, not an explicit `-O` flag.
 
 ## Programs
 
